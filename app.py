@@ -9,10 +9,10 @@ from oauth2client.service_account import ServiceAccountCredentials
 from PIL import Image, ImageDraw, ImageFont
 
 app = Flask(__name__)
-app.secret_key = "super_secret_bus_pass_key"
+app.secret_key = "607e45d2db089e704822b7fa34ea37ad"
 
 # --- IMGBB CONFIGURATION ---
-IMGBB_API_KEY = "607e45d2db089e704822b7fa34ea37ad"
+IMGBB_API_KEY = "YOUR_IMGBB_API_KEY_HERE"
 
 # --- GOOGLE SHEETS CONFIGURATION ---
 SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
@@ -155,19 +155,19 @@ def download_pass(pass_id):
 
     text_color = (0, 43, 91) 
     
-    # THE FINAL LAYOUT FIX - 134px gap restored
-    draw.text((490, 280), str(record.get('Name', '')), fill=text_color, font=font)
-    draw.text((490, 414), str(record.get('Enrollment ID', '')), fill=text_color, font=font)
-    draw.text((490, 548), str(record.get('Contact Number', '')), fill=text_color, font=font)
-    draw.text((490, 682), str(record.get('University Email', '')), fill=text_color, font=font)
-    draw.text((490, 816), str(record.get('Date', '')), fill=text_color, font=font)
-    draw.text((490, 950), str(record.get('Institute', '')), fill=text_color, font=font)
-    draw.text((490, 1084), str(record.get('Department', '')), fill=text_color, font=font)
-    draw.text((490, 1218), str(record.get('From Date', '')), fill=text_color, font=font)
-    draw.text((490, 1352), str(record.get('To Date', '')), fill=text_color, font=font)
-    draw.text((490, 1486), str(record.get('From Destination', '')), fill=text_color, font=font)
-    draw.text((490, 1620), str(record.get('To Destination', '')), fill=text_color, font=font)
-    draw.text((490, 1754), str(record.get('Number of travels', '')), fill=text_color, font=font)
+    # --- CORRECT LAYOUT ALIGNMENT ---
+    draw.text((490, 190), str(record.get('Name', '')), fill=text_color, font=font)
+    draw.text((490, 250), str(record.get('Enrollment ID', '')), fill=text_color, font=font)
+    draw.text((490, 310), str(record.get('Contact Number', '')), fill=text_color, font=font)
+    draw.text((490, 370), str(record.get('University Email', '')), fill=text_color, font=font)
+    draw.text((490, 430), str(record.get('Date', '')), fill=text_color, font=font)
+    draw.text((490, 490), str(record.get('Institute', '')), fill=text_color, font=font)
+    draw.text((490, 550), str(record.get('Department', '')), fill=text_color, font=font)
+    draw.text((490, 610), str(record.get('From Date', '')), fill=text_color, font=font)
+    draw.text((490, 670), str(record.get('To Date', '')), fill=text_color, font=font)
+    draw.text((490, 730), str(record.get('From Destination', '')), fill=text_color, font=font)
+    draw.text((490, 790), str(record.get('To Destination', '')), fill=text_color, font=font)
+    draw.text((490, 850), str(record.get('Number of travels', '')), fill=text_color, font=font)
 
     img_byte_arr = io.BytesIO()
     img.save(img_byte_arr, format='JPEG')
