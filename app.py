@@ -3,7 +3,7 @@ import uuid
 import io
 import base64
 import requests
-from flask import Flask, render_template, request, redirect, url_for, send_file, flash
+from flask import Flask, render_template, request, redirect, url_for, send_file, flash, Response
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from PIL import Image, ImageDraw, ImageFont
@@ -12,7 +12,7 @@ app = Flask(__name__)
 app.secret_key = "super_secret_bus_pass_key"
 
 # --- IMGBB CONFIGURATION ---
-IMGBB_API_KEY = "607e45d2db089e704822b7fa34ea37ad"  # <--- PASTE YOUR KEY HERE
+IMGBB_API_KEY = "YOUR_IMGBB_API_KEY_HERE"  # <--- PASTE YOUR KEY HERE
 
 # --- GOOGLE SHEETS CONFIGURATION ---
 SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
@@ -53,7 +53,7 @@ def submit_form():
     to_dest = request.form.get('to_dest')
     travels = request.form.get('travels')
     
-    # Handle ImgBB Upload
+    # Handle ImgBB Upload for Screenshots
     file = request.files.get('screenshot')
     screenshot_url = ""
     
@@ -85,6 +85,13 @@ def submit_form():
 
 @app.route('/admin')
 def admin_dashboard():
+    # --- SECURITY LOGIN CHECK ---
+    # You can change 'admin' and 'supersecret' to your preferred login details
+    auth = request.authorization
+    if not auth or auth.username != 'admin' or auth.password != 'supersecret':
+        return Response('Access Denied', 401, {'WWW-Authenticate': 'Basic realm="Login Required"'})
+    # ----------------------------
+    
     if not SHEET:
         return "Database connection error.", 500
     requests_list = SHEET.get_all_records()
@@ -100,6 +107,7 @@ def admin_action(pass_id, action):
     
     cell = SHEET.find(str(pass_id))
     if cell:
+        # Update column 15 (Status)
         SHEET.update_cell(cell.row, 15, new_status)
         
     return redirect(url_for('admin_dashboard'))
@@ -127,25 +135,27 @@ def download_pass(pass_id):
     img = Image.open(template_path)
     draw = ImageDraw.Draw(img)
     
+    # --- FONT & SIZING FIX ---
     try:
-        font = ImageFont.truetype("arial.ttf", 26)
+        font = ImageFont.truetype("Roboto-Bold.ttf", 32)
     except IOError:
-        font = ImageFont.load_default()
+        return "Font file missing! Please upload Roboto-Bold.ttf to your repository.", 500
 
     text_color = (0, 43, 91) 
     
-    draw.text((500, 195), str(record.get('Name')), fill=text_color, font=font)
-    draw.text((500, 255), str(record.get('Enrollment ID')), fill=text_color, font=font)
-    draw.text((500, 315), str(record.get('Contact Number')), fill=text_color, font=font)
-    draw.text((500, 375), str(record.get('University Email')), fill=text_color, font=font)
-    draw.text((500, 435), str(record.get('Date')), fill=text_color, font=font)
-    draw.text((500, 495), str(record.get('Institute')), fill=text_color, font=font)
-    draw.text((500, 555), str(record.get('Department')), fill=text_color, font=font)
-    draw.text((500, 615), str(record.get('From Date')), fill=text_color, font=font)
-    draw.text((500, 675), str(record.get('To Date')), fill=text_color, font=font)
-    draw.text((500, 735), str(record.get('From Destination')), fill=text_color, font=font)
-    draw.text((500, 795), str(record.get('To Destination')), fill=text_color, font=font)
-    draw.text((500, 855), str(record.get('Number of travels')), fill=text_color, font=font)
+    # --- LAYOUT ALIGNMENT FIX ---
+    draw.text((490, 215), str(record.get('Name')), fill=text_color, font=font)
+    draw.text((490, 282), str(record.get('Enrollment ID')), fill=text_color, font=font)
+    draw.text((490, 349), str(record.get('Contact Number')), fill=text_color, font=font)
+    draw.text((490, 416), str(record.get('University Email')), fill=text_color, font=font)
+    draw.text((490, 483), str(record.get('Date')), fill=text_color, font=font)
+    draw.text((490, 550), str(record.get('Institute')), fill=text_color, font=font)
+    draw.text((490, 617), str(record.get('Department')), fill=text_color, font=font)
+    draw.text((490, 684), str(record.get('From Date')), fill=text_color, font=font)
+    draw.text((490, 751), str(record.get('To Date')), fill=text_color, font=font)
+    draw.text((490, 818), str(record.get('From Destination')), fill=text_color, font=font)
+    draw.text((490, 885), str(record.get('To Destination')), fill=text_color, font=font)
+    draw.text((490, 952), str(record.get('Number of travels')), fill=text_color, font=font)
 
     img_byte_arr = io.BytesIO()
     img.save(img_byte_arr, format='JPEG')
