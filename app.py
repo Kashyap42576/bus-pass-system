@@ -12,7 +12,7 @@ app = Flask(__name__)
 app.secret_key = "super_secret_bus_pass_key"
 
 # --- IMGBB CONFIGURATION ---
-IMGBB_API_KEY = "YOUR_IMGBB_API_KEY_HERE"  # <--- PASTE YOUR KEY HERE
+IMGBB_API_KEY = "YOUR_IMGBB_API_KEY_HERE"
 
 # --- GOOGLE SHEETS CONFIGURATION ---
 SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
@@ -53,7 +53,6 @@ def submit_form():
     to_dest = request.form.get('to_dest')
     travels = request.form.get('travels')
     
-    # Handle ImgBB Upload for Screenshots
     file = request.files.get('screenshot')
     screenshot_url = ""
     
@@ -69,7 +68,7 @@ def submit_form():
         if response.status_code == 200:
             screenshot_url = response.json()['data']['url']
         else:
-            flash("Error uploading screenshot to cloud. Please try again.")
+            flash("Error uploading screenshot to cloud.")
             return redirect(url_for('index'))
 
     pass_id = str(uuid.uuid4())[:8]
@@ -80,17 +79,14 @@ def submit_form():
         from_dest, to_dest, travels, screenshot_url, "Pending"
     ])
     
-    flash("Application submitted successfully! Please check status using your email below.")
+    flash("Application submitted successfully!")
     return redirect(url_for('index'))
 
 @app.route('/admin')
 def admin_dashboard():
-    # --- SECURITY LOGIN CHECK ---
-    # You can change 'admin' and 'supersecret' to your preferred login details
     auth = request.authorization
     if not auth or auth.username != 'admin' or auth.password != 'supersecret':
         return Response('Access Denied', 401, {'WWW-Authenticate': 'Basic realm="Login Required"'})
-    # ----------------------------
     
     if not SHEET:
         return "Database connection error.", 500
@@ -107,7 +103,6 @@ def admin_action(pass_id, action):
     
     cell = SHEET.find(str(pass_id))
     if cell:
-        # Update column 15 (Status)
         SHEET.update_cell(cell.row, 15, new_status)
         
     return redirect(url_for('admin_dashboard'))
@@ -126,47 +121,37 @@ def download_pass(pass_id):
     record = dict(zip(headers, row_data))
     
     if record.get('Status') != 'Approved':
-        return "Unauthorized. This pass is not approved yet.", 403
+        return "Unauthorized.", 403
 
     template_path = "temporary-bus-pass.jpg"
-    if not os.path.exists(template_path):
-        return "Template image background missing on server.", 500
-        
     img = Image.open(template_path)
     draw = ImageDraw.Draw(img)
     
-    # --- FONT & SIZING FIX ---
     try:
         font = ImageFont.truetype("Roboto-Bold.ttf", 32)
     except IOError:
-        return "Font file missing! Please upload Roboto-Bold.ttf to your repository.", 500
+        return "Font file (Roboto-Bold.ttf) missing.", 500
 
     text_color = (0, 43, 91) 
     
-    # --- LAYOUT ALIGNMENT FIX ---
-    draw.text((490, 215), str(record.get('Name')), fill=text_color, font=font)
-    draw.text((490, 282), str(record.get('Enrollment ID')), fill=text_color, font=font)
-    draw.text((490, 349), str(record.get('Contact Number')), fill=text_color, font=font)
-    draw.text((490, 416), str(record.get('University Email')), fill=text_color, font=font)
-    draw.text((490, 483), str(record.get('Date')), fill=text_color, font=font)
-    draw.text((490, 550), str(record.get('Institute')), fill=text_color, font=font)
-    draw.text((490, 617), str(record.get('Department')), fill=text_color, font=font)
-    draw.text((490, 684), str(record.get('From Date')), fill=text_color, font=font)
-    draw.text((490, 751), str(record.get('To Date')), fill=text_color, font=font)
-    draw.text((490, 818), str(record.get('From Destination')), fill=text_color, font=font)
-    draw.text((490, 885), str(record.get('To Destination')), fill=text_color, font=font)
-    draw.text((490, 952), str(record.get('Number of travels')), fill=text_color, font=font)
+    draw.text((470, 280), str(record.get('Name')), fill=text_color, font=font)
+    draw.text((470, 414), str(record.get('Enrollment ID')), fill=text_color, font=font)
+    draw.text((470, 548), str(record.get('Contact Number')), fill=text_color, font=font)
+    draw.text((470, 682), str(record.get('University Email')), fill=text_color, font=font)
+    draw.text((470, 816), str(record.get('Date')), fill=text_color, font=font)
+    draw.text((470, 950), str(record.get('Institute')), fill=text_color, font=font)
+    draw.text((470, 1084), str(record.get('Department')), fill=text_color, font=font)
+    draw.text((470, 1218), str(record.get('From Date')), fill=text_color, font=font)
+    draw.text((470, 1352), str(record.get('To Date')), fill=text_color, font=font)
+    draw.text((470, 1486), str(record.get('From Destination')), fill=text_color, font=font)
+    draw.text((470, 1620), str(record.get('To Destination')), fill=text_color, font=font)
+    draw.text((470, 1754), str(record.get('Number of travels')), fill=text_color, font=font)
 
     img_byte_arr = io.BytesIO()
     img.save(img_byte_arr, format='JPEG')
     img_byte_arr.seek(0)
     
-    return send_file(
-        img_byte_arr, 
-        mimetype='image/jpeg', 
-        as_attachment=True, 
-        download_name=f"BusPass_{record.get('Enrollment ID')}.jpg"
-    )
+    return send_file(img_byte_arr, mimetype='image/jpeg', as_attachment=True, download_name=f"BusPass_{record.get('Enrollment ID')}.jpg")
 
 if __name__ == '__main__':
     app.run(debug=True)
