@@ -155,19 +155,20 @@ def download_pass(pass_id):
 
     text_color = (0, 43, 91) 
     
-    # --- THE FINAL, VERIFIED COORDINATES ---
-    draw.text((490, 215), str(record.get('Name', '')), fill=text_color, font=font)
-    draw.text((490, 282), str(record.get('Enrollment ID', '')), fill=text_color, font=font)
-    draw.text((490, 349), str(record.get('Contact Number', '')), fill=text_color, font=font)
-    draw.text((490, 416), str(record.get('University Email', '')), fill=text_color, font=font)
-    draw.text((490, 483), str(record.get('Date', '')), fill=text_color, font=font)
-    draw.text((490, 550), str(record.get('Institute', '')), fill=text_color, font=font)
-    draw.text((490, 617), str(record.get('Department', '')), fill=text_color, font=font)
-    draw.text((490, 684), str(record.get('From Date', '')), fill=text_color, font=font)
-    draw.text((490, 751), str(record.get('To Date', '')), fill=text_color, font=font)
-    draw.text((490, 818), str(record.get('From Destination', '')), fill=text_color, font=font)
-    draw.text((490, 885), str(record.get('To Destination', '')), fill=text_color, font=font)
-    draw.text((490, 952), str(record.get('Number of travels', '')), fill=text_color, font=font)
+    # --- EXACT COORDINATES FROM 1000080173.jpg ---
+    x_pos = 503
+    draw.text((x_pos, 301), str(record.get('Name', '')), fill=text_color, font=font)
+    draw.text((x_pos, 384), str(record.get('Enrollment ID', '')), fill=text_color, font=font)
+    draw.text((x_pos, 469), str(record.get('Contact Number', '')), fill=text_color, font=font)
+    draw.text((x_pos, 554), str(record.get('University Email', '')), fill=text_color, font=font)
+    draw.text((x_pos, 640), str(record.get('Date', '')), fill=text_color, font=font)
+    draw.text((x_pos, 755), str(record.get('Institute', '')), fill=text_color, font=font)
+    draw.text((x_pos, 832), str(record.get('Department', '')), fill=text_color, font=font)
+    draw.text((x_pos, 924), str(record.get('From Date', '')), fill=text_color, font=font)
+    draw.text((x_pos, 1008), str(record.get('To Date', '')), fill=text_color, font=font)
+    draw.text((x_pos, 1093), str(record.get('From Destination', '')), fill=text_color, font=font)
+    draw.text((x_pos, 1179), str(record.get('To Destination', '')), fill=text_color, font=font)
+    draw.text((x_pos, 1265), str(record.get('Number of travels', '')), fill=text_color, font=font)
 
     img_byte_arr = io.BytesIO()
     img.save(img_byte_arr, format='JPEG')
