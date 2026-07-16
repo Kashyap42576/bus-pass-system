@@ -73,11 +73,37 @@ def submit_form():
 
     pass_id = str(uuid.uuid4())[:8]
     
-    SHEET.append_row([
-        pass_id, name, enrollment, contact, email, date, 
-        institute, department, from_date, to_date, 
-        from_dest, to_dest, travels, screenshot_url, "Pending"
-    ])
+    # --- BULLETPROOF DATA MAPPING FIX ---
+    # Fetch exact headers from Google Sheets
+    headers = SHEET.row_values(1)
+    
+    # Map form data strictly to column header names
+    form_data_map = {
+        "ID": pass_id,
+        "Name": name,
+        "Enrollment ID": enrollment,
+        "Contact Number": contact,
+        "University Email": email,
+        "Date": date,
+        "Institute": institute,
+        "Department": department,
+        "From Date": from_date,
+        "To Date": to_date,
+        "From Destination": from_dest,
+        "To Destination": to_dest,
+        "Number of travels": travels,
+        "Screenshot URL": screenshot_url,
+        "Status": "Pending"
+    }
+    
+    # Build row matching the exact Google Sheet order to prevent shifting
+    row_data = [form_data_map.get(str(header).strip(), "") for header in headers]
+    
+    # Fallback just in case headers are completely missing
+    if not headers or len(headers) < 5:
+        row_data = [pass_id, name, enrollment, contact, email, date, institute, department, from_date, to_date, from_dest, to_dest, travels, screenshot_url, "Pending"]
+
+    SHEET.append_row(row_data)
     
     flash("Application submitted successfully!")
     return redirect(url_for('index'))
@@ -134,18 +160,21 @@ def download_pass(pass_id):
 
     text_color = (0, 43, 91) 
     
-    draw.text((470, 280), str(record.get('Name')), fill=text_color, font=font)
-    draw.text((470, 414), str(record.get('Enrollment ID')), fill=text_color, font=font)
-    draw.text((470, 548), str(record.get('Contact Number')), fill=text_color, font=font)
-    draw.text((470, 682), str(record.get('University Email')), fill=text_color, font=font)
-    draw.text((470, 816), str(record.get('Date')), fill=text_color, font=font)
-    draw.text((470, 950), str(record.get('Institute')), fill=text_color, font=font)
-    draw.text((470, 1084), str(record.get('Department')), fill=text_color, font=font)
-    draw.text((470, 1218), str(record.get('From Date')), fill=text_color, font=font)
-    draw.text((470, 1352), str(record.get('To Date')), fill=text_color, font=font)
-    draw.text((470, 1486), str(record.get('From Destination')), fill=text_color, font=font)
-    draw.text((470, 1620), str(record.get('To Destination')), fill=text_color, font=font)
-    draw.text((470, 1754), str(record.get('Number of travels')), fill=text_color, font=font)
+    # --- FIXED COORDINATES ---
+    # Reverted back to the exact 67-pixel vertical gap to perfectly hit the lines
+    # Added `.get('Key', '')` to prevent printing "None" if a cell is empty
+    draw.text((490, 215), str(record.get('Name', '')), fill=text_color, font=font)
+    draw.text((490, 282), str(record.get('Enrollment ID', '')), fill=text_color, font=font)
+    draw.text((490, 349), str(record.get('Contact Number', '')), fill=text_color, font=font)
+    draw.text((490, 416), str(record.get('University Email', '')), fill=text_color, font=font)
+    draw.text((490, 483), str(record.get('Date', '')), fill=text_color, font=font)
+    draw.text((490, 550), str(record.get('Institute', '')), fill=text_color, font=font)
+    draw.text((490, 617), str(record.get('Department', '')), fill=text_color, font=font)
+    draw.text((490, 684), str(record.get('From Date', '')), fill=text_color, font=font)
+    draw.text((490, 751), str(record.get('To Date', '')), fill=text_color, font=font)
+    draw.text((490, 818), str(record.get('From Destination', '')), fill=text_color, font=font)
+    draw.text((490, 885), str(record.get('To Destination', '')), fill=text_color, font=font)
+    draw.text((490, 952), str(record.get('Number of travels', '')), fill=text_color, font=font)
 
     img_byte_arr = io.BytesIO()
     img.save(img_byte_arr, format='JPEG')
