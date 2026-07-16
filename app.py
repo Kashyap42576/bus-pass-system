@@ -12,7 +12,7 @@ app = Flask(__name__)
 app.secret_key = "super_secret_bus_pass_key"
 
 # --- IMGBB CONFIGURATION ---
-IMGBB_API_KEY = "YOUR_IMGBB_API_KEY_HERE"
+IMGBB_API_KEY = "607e45d2db089e704822b7fa34ea37ad"
 
 # --- GOOGLE SHEETS CONFIGURATION ---
 SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
@@ -73,11 +73,8 @@ def submit_form():
 
     pass_id = str(uuid.uuid4())[:8]
     
-    # --- BULLETPROOF DATA MAPPING FIX ---
-    # Fetch exact headers from Google Sheets
     headers = SHEET.row_values(1)
     
-    # Map form data strictly to column header names
     form_data_map = {
         "ID": pass_id,
         "Name": name,
@@ -96,10 +93,8 @@ def submit_form():
         "Status": "Pending"
     }
     
-    # Build row matching the exact Google Sheet order to prevent shifting
     row_data = [form_data_map.get(str(header).strip(), "") for header in headers]
     
-    # Fallback just in case headers are completely missing
     if not headers or len(headers) < 5:
         row_data = [pass_id, name, enrollment, contact, email, date, institute, department, from_date, to_date, from_dest, to_dest, travels, screenshot_url, "Pending"]
 
@@ -160,21 +155,19 @@ def download_pass(pass_id):
 
     text_color = (0, 43, 91) 
     
-    # --- FIXED COORDINATES ---
-    # Reverted back to the exact 67-pixel vertical gap to perfectly hit the lines
-    # Added `.get('Key', '')` to prevent printing "None" if a cell is empty
-    draw.text((490, 215), str(record.get('Name', '')), fill=text_color, font=font)
-    draw.text((490, 282), str(record.get('Enrollment ID', '')), fill=text_color, font=font)
-    draw.text((490, 349), str(record.get('Contact Number', '')), fill=text_color, font=font)
-    draw.text((490, 416), str(record.get('University Email', '')), fill=text_color, font=font)
-    draw.text((490, 483), str(record.get('Date', '')), fill=text_color, font=font)
-    draw.text((490, 550), str(record.get('Institute', '')), fill=text_color, font=font)
-    draw.text((490, 617), str(record.get('Department', '')), fill=text_color, font=font)
-    draw.text((490, 684), str(record.get('From Date', '')), fill=text_color, font=font)
-    draw.text((490, 751), str(record.get('To Date', '')), fill=text_color, font=font)
-    draw.text((490, 818), str(record.get('From Destination', '')), fill=text_color, font=font)
-    draw.text((490, 885), str(record.get('To Destination', '')), fill=text_color, font=font)
-    draw.text((490, 952), str(record.get('Number of travels', '')), fill=text_color, font=font)
+    # THE FINAL LAYOUT FIX - 134px gap restored
+    draw.text((490, 280), str(record.get('Name', '')), fill=text_color, font=font)
+    draw.text((490, 414), str(record.get('Enrollment ID', '')), fill=text_color, font=font)
+    draw.text((490, 548), str(record.get('Contact Number', '')), fill=text_color, font=font)
+    draw.text((490, 682), str(record.get('University Email', '')), fill=text_color, font=font)
+    draw.text((490, 816), str(record.get('Date', '')), fill=text_color, font=font)
+    draw.text((490, 950), str(record.get('Institute', '')), fill=text_color, font=font)
+    draw.text((490, 1084), str(record.get('Department', '')), fill=text_color, font=font)
+    draw.text((490, 1218), str(record.get('From Date', '')), fill=text_color, font=font)
+    draw.text((490, 1352), str(record.get('To Date', '')), fill=text_color, font=font)
+    draw.text((490, 1486), str(record.get('From Destination', '')), fill=text_color, font=font)
+    draw.text((490, 1620), str(record.get('To Destination', '')), fill=text_color, font=font)
+    draw.text((490, 1754), str(record.get('Number of travels', '')), fill=text_color, font=font)
 
     img_byte_arr = io.BytesIO()
     img.save(img_byte_arr, format='JPEG')
