@@ -25,6 +25,7 @@
                 <th>App Date</th>
                 <th>Validity (From - To)</th>
                 <th>Route (From - To)</th>
+                <th>Shift</th> <!-- NEW SHIFT HEADER -->
                 <th>Travels</th>
                 <th>Screenshot</th>
                 <th>Status</th>
@@ -40,6 +41,7 @@
                 <td>{{ req['Date'] }}</td>
                 <td>{{ req['From Date'] }}<br>to<br>{{ req['To Date'] }}</td>
                 <td>{{ req['From Destination'] }}<br>↓<br>{{ req['To Destination'] }}</td>
+                <td>{{ req['Shift'] }}</td> <!-- NEW SHIFT DATA CELL -->
                 <td>{{ req['Number of travels'] }}</td>
                 <td>
                     {% if req['Screenshot URL'] %}
