@@ -13,7 +13,7 @@ app = Flask(__name__)
 app.secret_key = "super_secret_bus_pass_key"
 
 # --- IMGBB CONFIGURATION ---
-IMGBB_API_KEY = "607e45d2db089e704822b7fa34ea37ad"
+IMGBB_API_KEY = "abd07d8cf6538f623d8576457ee6c65c"
 
 # --- GOOGLE SHEETS CONFIGURATION ---
 SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
