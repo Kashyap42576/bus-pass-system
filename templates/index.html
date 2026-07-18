@@ -23,7 +23,7 @@
         {% with messages = get_flashed_messages() %}{% if messages %}{% for msg in messages %}<p style="color: green; font-weight: bold;">{{ msg }}</p>{% endfor %}{% endif %}{% endwith %}
         <form action="/submit" method="POST" enctype="multipart/form-data">
             <div class="form-group"><label>Full Name</label><input type="text" name="name" placeholder="Enter Your Full Name" required></div>
-            <div class="form-group"><label>Enrollment Number / MIS ID</label><input type="text" name="enrollment" placeholder="Enter Your Enrollment Number" required></div>
+            <div class="form-group"><label>Enrollment Number / MIS ID</label><input type="text" name="enrollment" placeholder="Enter Your University ID" required></div>
             <div class="form-group"><label>Contact</label><input type="text" name="contact" placeholder="Enter Your Contact Number" required></div>
             <div class="form-group"><label>University Email</label><input type="email" name="email" placeholder="Enter Your E-Mail" required></div>
             <div class="form-group"><label>Date</label><input type="date" name="date" required></div>
