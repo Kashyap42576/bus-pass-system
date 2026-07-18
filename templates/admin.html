@@ -2,72 +2,42 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Admin Dashboard - Bus Pass Management</title>
+    <title>Admin Dashboard</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f8f9fa; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; background: white; }
-        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; font-size: 13px; }
+        body { font-family: Arial; margin: 20px; background-color: #f8f9fa; }
+        table { width: 100%; border-collapse: collapse; background: white; }
+        th, td { border: 1px solid #ddd; padding: 10px; }
         th { background-color: #002b5b; color: white; }
-        tr:nth-child(even) { background-color: #f2f2f2; }
-        .btn { padding: 6px 10px; border: none; border-radius: 4px; color: white; cursor: pointer; text-decoration: none; font-size: 12px; }
-        .btn-approve { background-color: #5cb85c; }
-        .btn-reject { background-color: #d9534f; }
-        .btn-download { background-color: #0275d8; }
-        img.screenshot { max-width: 120px; border-radius: 4px; cursor: zoom-in; }
+        .btn { padding: 5px 10px; color: white; text-decoration: none; border-radius: 4px; }
+        .approve { background-color: #5cb85c; }
+        .reject { background-color: #d9534f; }
     </style>
 </head>
 <body>
-
-    <h2>Admin Dashboard - Bus Pass Requests</h2>
-
+    <h2>Admin Dashboard</h2>
     <table>
-        <thead>
-            <tr>
-                <th>ID</th>
-                <th>Name / Enrollment</th>
-                <th>Email / Contact</th>
-                <th>Validity (From-To)</th>
-                <th>Route (From-To)</th>
-                <th>Travels</th>
-                <th>Screenshot</th>
-                <th>Status</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
+        <thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Screenshot</th><th>Status</th><th>Action</th></tr></thead>
         <tbody>
             {% for req in requests %}
             <tr>
                 <td>{{ req['ID'] }}</td>
-                <td><strong>{{ req['Name'] }}</strong><br><small>{{ req['Enrollment ID'] }}</small></td>
-                <td>{{ req['University Email'] }}<br><small>{{ req['Contact Number'] }}</small></td>
-                <td>{{ req['From Date'] }} to {{ req['To Date'] }}</td>
-                <td>{{ req['From Destination'] }} → {{ req['To Destination'] }}</td>
-                <td>{{ req['Number of travels'] }}</td>
-                <td>
-                    {% if req['Screenshot URL'] %}
-                        <!-- THIS SECTION CHANGED: It now uses the direct ImgBB link from the database -->
-                        <a href="{{ req['Screenshot URL'] }}" target="_blank">
-                            <img src="{{ req['Screenshot URL'] }}" class="screenshot" alt="Payment">
-                        </a>
-                    {% else %}
-                        No Image
-                    {% endif %}
-                </td>
-                <td><strong style="color: {% if req['Status']=='Approved' %}green{% elif req['Status']=='Rejected' %}red{% else %}orange{% endif %};">{{ req['Status'] }}</strong></td>
+                <td>{{ req['Name'] }}</td>
+                <td>{{ req['University Email'] }}</td>
+                <td><a href="{{ req['Screenshot URL'] }}" target="_blank">View</a></td>
+                <td><strong>{{ req['Status'] }}</strong></td>
                 <td>
                     {% if req['Status'] == 'Pending' %}
-                        <a href="/admin/action/{{ req['ID'] }}/approve" class="btn btn-approve">Approve</a>
-                        <a href="/admin/action/{{ req['ID'] }}/reject" class="btn btn-reject">Reject</a>
+                        <a href="/admin/action/{{ req['ID'] }}/approve" class="btn approve">Approve</a>
+                        <a href="/admin/action/{{ req['ID'] }}/reject" class="btn reject">Reject</a>
                     {% elif req['Status'] == 'Approved' %}
-                        <a href="/download/{{ req['ID'] }}" class="btn btn-download">Download Pass</a>
-                    {% else %}
-                        Closed
+                        <a href="/download/{{ req['ID'] }}" class="btn">Download</a>
+                    {% elif req['Status'] == 'Expired' %}
+                        <span style="color: gray;">Expired</span>
                     {% endif %}
                 </td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
-
 </body>
 </html>
