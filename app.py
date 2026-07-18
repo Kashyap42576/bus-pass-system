@@ -3,6 +3,7 @@ import uuid
 import io
 import base64
 import requests
+from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, send_file, flash, Response
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
@@ -33,6 +34,12 @@ def index():
         all_records = SHEET.get_all_records()
         user_passes = [r for r in all_records if str(r.get('University Email')).strip().lower() == search_query.strip().lower()]
         
+        # Check for expired passes dynamically
+        today = datetime.now().strftime('%Y-%m-%d')
+        for p in user_passes:
+            if p.get('Status') == 'Approved' and p.get('To Date', '') < today:
+                p['Status'] = 'Expired'
+                
     return render_template('index.html', user_passes=user_passes, search_query=search_query)
 
 @app.route('/submit', methods=['POST'])
@@ -111,7 +118,15 @@ def admin_dashboard():
     
     if not SHEET:
         return "Database connection error.", 500
+        
     requests_list = SHEET.get_all_records()
+    
+    # Check for expired passes dynamically on admin dashboard
+    today = datetime.now().strftime('%Y-%m-%d')
+    for req in requests_list:
+        if req.get('Status') == 'Approved' and req.get('To Date', '') < today:
+            req['Status'] = 'Expired'
+            
     return render_template('admin.html', requests=requests_list)
 
 @app.route('/admin/action/<pass_id>/<action>')
@@ -141,8 +156,12 @@ def download_pass(pass_id):
     headers = SHEET.row_values(1)
     record = dict(zip(headers, row_data))
     
+    # Block download if status is not approved OR if the pass date has expired
+    today = datetime.now().strftime('%Y-%m-%d')
     if record.get('Status') != 'Approved':
-        return "Unauthorized.", 403
+        return "Unauthorized. Pass is not approved.", 403
+    if record.get('To Date', '') < today:
+        return "Unauthorized. This pass has expired.", 403
 
     template_path = "temporary-bus-pass.jpg"
     img = Image.open(template_path)
@@ -155,7 +174,6 @@ def download_pass(pass_id):
 
     text_color = (0, 43, 91) 
     
-    # --- EXACT COORDINATES FROM 1000080173.jpg ---
     x_pos = 503
     draw.text((x_pos, 301), str(record.get('Name', '')), fill=text_color, font=font)
     draw.text((x_pos, 384), str(record.get('Enrollment ID', '')), fill=text_color, font=font)
