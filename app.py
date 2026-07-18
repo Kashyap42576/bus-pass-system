@@ -57,7 +57,7 @@ def submit_form():
     to_date = request.form.get('to_date')
     from_dest = request.form.get('from_dest')
     to_dest = request.form.get('to_dest')
-    shift = request.form.get('shift')  # <-- GRABBING THE NEW SHIFT FIELD
+    shift = request.form.get('shift')  
     travels = request.form.get('travels')
     
     file = request.files.get('screenshot')
@@ -75,7 +75,13 @@ def submit_form():
         if response.status_code == 200:
             screenshot_url = response.json()['data']['url']
         else:
-            flash("Error uploading screenshot to cloud.")
+            try:
+                imgbb_error = response.json().get('error', {}).get('message', 'Unknown ImgBB API Error')
+            except Exception:
+                imgbb_error = "Could not parse API response JSON"
+                
+            flash(f"Cloud Upload Failed ({response.status_code}): {imgbb_error}")
+            print(f"CRITICAL DEBUG INFO - ImgBB Response: {response.text}")
             return redirect(url_for('index'))
 
     pass_id = str(uuid.uuid4())[:8]
@@ -95,7 +101,7 @@ def submit_form():
         "To Date": to_date,
         "From Destination": from_dest,
         "To Destination": to_dest,
-        "Shift": shift,  # <-- ADDING IT TO THE SPREADSHEET MAP
+        "Shift": shift,  
         "Number of travels": travels,
         "Screenshot URL": screenshot_url,
         "Status": "Pending"
