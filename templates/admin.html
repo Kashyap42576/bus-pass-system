@@ -11,6 +11,7 @@
         .btn { padding: 5px 10px; color: white; text-decoration: none; border-radius: 4px; }
         .approve { background-color: #5cb85c; }
         .reject { background-color: #d9534f; }
+        .download { background-color: #0275d8; } /* Added missing blue background */
     </style>
 </head>
 <body>
@@ -30,9 +31,9 @@
                         <a href="/admin/action/{{ req['ID'] }}/approve" class="btn approve">Approve</a>
                         <a href="/admin/action/{{ req['ID'] }}/reject" class="btn reject">Reject</a>
                     {% elif req['Status'] == 'Approved' %}
-                        <a href="/download/{{ req['ID'] }}" class="btn">Download</a>
+                        <a href="/download/{{ req['ID'] }}" class="btn download">Download</a>
                     {% elif req['Status'] == 'Expired' %}
-                        <span style="color: gray;">Expired</span>
+                        <span style="color: gray; font-weight: bold;">Expired</span>
                     {% endif %}
                 </td>
             </tr>
