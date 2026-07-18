@@ -34,7 +34,6 @@ def index():
         all_records = SHEET.get_all_records()
         user_passes = [r for r in all_records if str(r.get('University Email')).strip().lower() == search_query.strip().lower()]
         
-        # Check for expired passes dynamically
         today = datetime.now().strftime('%Y-%m-%d')
         for p in user_passes:
             if p.get('Status') == 'Approved' and p.get('To Date', '') < today:
@@ -58,6 +57,7 @@ def submit_form():
     to_date = request.form.get('to_date')
     from_dest = request.form.get('from_dest')
     to_dest = request.form.get('to_dest')
+    shift = request.form.get('shift')  # <-- GRABBING THE NEW SHIFT FIELD
     travels = request.form.get('travels')
     
     file = request.files.get('screenshot')
@@ -95,6 +95,7 @@ def submit_form():
         "To Date": to_date,
         "From Destination": from_dest,
         "To Destination": to_dest,
+        "Shift": shift,  # <-- ADDING IT TO THE SPREADSHEET MAP
         "Number of travels": travels,
         "Screenshot URL": screenshot_url,
         "Status": "Pending"
@@ -103,7 +104,7 @@ def submit_form():
     row_data = [form_data_map.get(str(header).strip(), "") for header in headers]
     
     if not headers or len(headers) < 5:
-        row_data = [pass_id, name, enrollment, contact, email, date, institute, department, from_date, to_date, from_dest, to_dest, travels, screenshot_url, "Pending"]
+        row_data = [pass_id, name, enrollment, contact, email, date, institute, department, from_date, to_date, from_dest, to_dest, shift, travels, screenshot_url, "Pending"]
 
     SHEET.append_row(row_data)
     
@@ -121,7 +122,6 @@ def admin_dashboard():
         
     requests_list = SHEET.get_all_records()
     
-    # Check for expired passes dynamically on admin dashboard
     today = datetime.now().strftime('%Y-%m-%d')
     for req in requests_list:
         if req.get('Status') == 'Approved' and req.get('To Date', '') < today:
@@ -156,7 +156,6 @@ def download_pass(pass_id):
     headers = SHEET.row_values(1)
     record = dict(zip(headers, row_data))
     
-    # Block download if status is not approved OR if the pass date has expired
     today = datetime.now().strftime('%Y-%m-%d')
     if record.get('Status') != 'Approved':
         return "Unauthorized. Pass is not approved.", 403
