@@ -5,26 +5,49 @@
     <title>Admin Dashboard</title>
     <style>
         body { font-family: Arial; margin: 20px; background-color: #f8f9fa; }
-        table { width: 100%; border-collapse: collapse; background: white; }
+        table { width: 100%; border-collapse: collapse; background: white; font-size: 14px; }
         th, td { border: 1px solid #ddd; padding: 10px; }
         th { background-color: #002b5b; color: white; }
-        .btn { padding: 5px 10px; color: white; text-decoration: none; border-radius: 4px; }
+        .btn { padding: 5px 10px; color: white; text-decoration: none; border-radius: 4px; display: inline-block; margin-top: 2px; }
         .approve { background-color: #5cb85c; }
         .reject { background-color: #d9534f; }
-        .download { background-color: #0275d8; } /* Added missing blue background */
+        .download { background-color: #0275d8; }
     </style>
 </head>
 <body>
     <h2>Admin Dashboard</h2>
     <table>
-        <thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Screenshot</th><th>Status</th><th>Action</th></tr></thead>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Name / Enrollment</th>
+                <th>Email / Contact</th>
+                <th>App Date</th>
+                <th>Validity (From - To)</th>
+                <th>Route (From - To)</th>
+                <th>Travels</th>
+                <th>Screenshot</th>
+                <th>Status</th>
+                <th>Action</th>
+            </tr>
+        </thead>
         <tbody>
             {% for req in requests %}
             <tr>
                 <td>{{ req['ID'] }}</td>
-                <td>{{ req['Name'] }}</td>
-                <td>{{ req['University Email'] }}</td>
-                <td><a href="{{ req['Screenshot URL'] }}" target="_blank">View</a></td>
+                <td><strong>{{ req['Name'] }}</strong><br><small>{{ req['Enrollment ID'] }}</small></td>
+                <td>{{ req['University Email'] }}<br><small>{{ req['Contact Number'] }}</small></td>
+                <td>{{ req['Date'] }}</td>
+                <td>{{ req['From Date'] }}<br>to<br>{{ req['To Date'] }}</td>
+                <td>{{ req['From Destination'] }}<br>↓<br>{{ req['To Destination'] }}</td>
+                <td>{{ req['Number of travels'] }}</td>
+                <td>
+                    {% if req['Screenshot URL'] %}
+                        <a href="{{ req['Screenshot URL'] }}" target="_blank">View</a>
+                    {% else %}
+                        No Image
+                    {% endif %}
+                </td>
                 <td><strong>{{ req['Status'] }}</strong></td>
                 <td>
                     {% if req['Status'] == 'Pending' %}
