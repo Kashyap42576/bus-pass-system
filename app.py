@@ -1,19 +1,24 @@
 import os
 import uuid
 import io
-import base64
-import requests
 from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, send_file, flash, Response
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from PIL import Image, ImageDraw, ImageFont
 
+# --- CLOUDINARY CONFIGURATION ---
+import cloudinary
+import cloudinary.uploader
+
+cloudinary.config(
+  cloud_name = "adqoktfc",
+  api_key = "264368975959274",
+  api_secret = "O8MLzxZOS4I4cIgt2KKRzN6f4l8"
+)
+
 app = Flask(__name__)
 app.secret_key = "super_secret_bus_pass_key"
-
-# --- IMGBB CONFIGURATION ---
-IMGBB_API_KEY = "abd07d8cf6538f623d8576457ee6c65c"
 
 # --- GOOGLE SHEETS CONFIGURATION ---
 SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
@@ -63,25 +68,14 @@ def submit_form():
     file = request.files.get('screenshot')
     screenshot_url = ""
     
+    # --- CLOUDINARY API UPLOAD LOGIC ---
     if file:
-        image_data = base64.b64encode(file.read()).decode('utf-8')
-        response = requests.post(
-            "https://api.imgbb.com/1/upload",
-            data={
-                "key": IMGBB_API_KEY,
-                "image": image_data
-            }
-        )
-        if response.status_code == 200:
-            screenshot_url = response.json()['data']['url']
-        else:
-            try:
-                imgbb_error = response.json().get('error', {}).get('message', 'Unknown ImgBB API Error')
-            except Exception:
-                imgbb_error = "Could not parse API response JSON"
-                
-            flash(f"Cloud Upload Failed ({response.status_code}): {imgbb_error}")
-            print(f"CRITICAL DEBUG INFO - ImgBB Response: {response.text}")
+        try:
+            upload_result = cloudinary.uploader.upload(file)
+            screenshot_url = upload_result.get('secure_url')
+        except Exception as e:
+            flash(f"Cloud Upload Failed: {str(e)}")
+            print(f"CRITICAL DEBUG INFO - Cloudinary Error: {str(e)}")
             return redirect(url_for('index'))
 
     pass_id = str(uuid.uuid4())[:8]
