@@ -1,6 +1,7 @@
 import os
 import uuid
 import io
+import requests
 from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, send_file, flash, Response
 import gspread
@@ -65,15 +66,28 @@ def submit_form():
     shift = request.form.get('shift')  
     travels = request.form.get('travels')
     
-    file = request.files.get('screenshot')
-    screenshot_url = ""
+    screenshot_file = request.files.get('screenshot')
+    photo_file = request.files.get('passenger_photo')
     
-    if file:
+    screenshot_url = ""
+    photo_url = ""
+    
+    # 1. Upload Payment Screenshot to Cloudinary
+    if screenshot_file:
         try:
-            upload_result = cloudinary.uploader.upload(file)
+            upload_result = cloudinary.uploader.upload(screenshot_file)
             screenshot_url = upload_result.get('secure_url')
         except Exception as e:
-            flash(f"Cloud Upload Failed: {str(e)}")
+            flash(f"Payment Screenshot Upload Failed: {str(e)}")
+            return redirect(url_for('index'))
+
+    # 2. Upload Passenger Photo to Cloudinary
+    if photo_file:
+        try:
+            upload_photo_result = cloudinary.uploader.upload(photo_file)
+            photo_url = upload_photo_result.get('secure_url')
+        except Exception as e:
+            flash(f"Passenger Photo Upload Failed: {str(e)}")
             return redirect(url_for('index'))
 
     pass_id = str(uuid.uuid4())[:8]
@@ -95,6 +109,7 @@ def submit_form():
         "To Destination": to_dest,
         "Shift": shift,  
         "Number of travels": travels,
+        "Passenger Photo URL": photo_url,
         "Screenshot URL": screenshot_url,
         "Status": "Pending"
     }
@@ -102,7 +117,7 @@ def submit_form():
     row_data = [form_data_map.get(str(header).strip(), "") for header in headers]
     
     if not headers or len(headers) < 5:
-        row_data = [pass_id, name, enrollment, contact, email, date, institute, department, from_date, to_date, from_dest, to_dest, shift, travels, screenshot_url, "Pending"]
+        row_data = [pass_id, name, enrollment, contact, email, date, institute, department, from_date, to_date, from_dest, to_dest, shift, travels, photo_url, screenshot_url, "Pending"]
 
     SHEET.append_row(row_data)
     
@@ -137,12 +152,11 @@ def admin_action(pass_id, action):
     
     cell = SHEET.find(str(pass_id))
     if cell:
-        # DYNAMICALLY FIND THE 'Status' COLUMN INDEX
         headers = SHEET.row_values(1)
         if "Status" in headers:
             status_col = headers.index("Status") + 1
         else:
-            status_col = len(headers)  # fallback to last column
+            status_col = len(headers)
             
         SHEET.update_cell(cell.row, status_col, new_status)
         
@@ -168,29 +182,48 @@ def download_pass(pass_id):
         return "Unauthorized. This pass has expired.", 403
 
     template_path = "temporary-bus-pass.jpg"
-    img = Image.open(template_path)
+    img = Image.open(template_path).convert("RGB")
     draw = ImageDraw.Draw(img)
     
+    # --- FONTS SETUP ---
     try:
-        font = ImageFont.truetype("Roboto-Bold.ttf", 32)
+        font_25 = ImageFont.truetype("Roboto-Bold.ttf", 25)
+        font_20 = ImageFont.truetype("Roboto-Bold.ttf", 20)
     except IOError:
-        return "Font file (Roboto-Bold.ttf) missing.", 500
+        font_25 = ImageFont.load_default()
+        font_20 = ImageFont.load_default()
 
-    text_color = (0, 43, 91) 
+    text_color = (0, 43, 91) # Dark Navy Blue matching template header
     
-    x_pos = 503
-    draw.text((x_pos, 301), str(record.get('Name', '')), fill=text_color, font=font)
-    draw.text((x_pos, 384), str(record.get('Enrollment ID', '')), fill=text_color, font=font)
-    draw.text((x_pos, 469), str(record.get('Contact Number', '')), fill=text_color, font=font)
-    draw.text((x_pos, 554), str(record.get('University Email', '')), fill=text_color, font=font)
-    draw.text((x_pos, 640), str(record.get('Date', '')), fill=text_color, font=font)
-    draw.text((x_pos, 755), str(record.get('Institute', '')), fill=text_color, font=font)
-    draw.text((x_pos, 832), str(record.get('Department', '')), fill=text_color, font=font)
-    draw.text((x_pos, 924), str(record.get('From Date', '')), fill=text_color, font=font)
-    draw.text((x_pos, 1008), str(record.get('To Date', '')), fill=text_color, font=font)
-    draw.text((x_pos, 1093), str(record.get('From Destination', '')), fill=text_color, font=font)
-    draw.text((x_pos, 1179), str(record.get('To Destination', '')), fill=text_color, font=font)
-    draw.text((x_pos, 1265), str(record.get('Number of travels', '')), fill=text_color, font=font)
+    # --- 1. PASTE PASSENGER PHOTO ---
+    # Position: X = 743, Y = 270 | Size: 230px (W) x 286px (H)
+    photo_url = record.get('Passenger Photo URL')
+    if photo_url:
+        try:
+            photo_response = requests.get(photo_url, stream=True)
+            if photo_response.status_code == 200:
+                passenger_img = Image.open(photo_response.raw).convert("RGB")
+                passenger_img = passenger_img.resize((230, 286), Image.Resampling.LANCZOS)
+                img.paste(passenger_img, (743, 270))
+        except Exception as e:
+            print(f"Error fetching/pasting passenger photo: {e}")
+
+    # --- 2. DRAW TEXT VALUES ---
+    # Shared X-Position = 479
+    x_pos = 479
+    
+    draw.text((x_pos, 406), str(record.get('Name', '')), fill=text_color, font=font_25)
+    draw.text((x_pos, 493), str(record.get('Enrollment ID', '')), fill=text_color, font=font_25)
+    draw.text((x_pos, 582), str(record.get('Contact Number', '')), fill=text_color, font=font_25)
+    draw.text((x_pos, 676), str(record.get('University Email', '')), fill=text_color, font=font_20)
+    draw.text((x_pos, 763), str(record.get('Date', '')), fill=text_color, font=font_25)
+    draw.text((x_pos, 874), str(record.get('Institute', '')), fill=text_color, font=font_25)
+    draw.text((x_pos, 960), str(record.get('Department', '')), fill=text_color, font=font_25)
+    draw.text((x_pos, 1052), str(record.get('From Date', '')), fill=text_color, font=font_25)
+    draw.text((x_pos, 1142), str(record.get('To Date', '')), fill=text_color, font=font_25)
+    draw.text((x_pos, 1229), str(record.get('From Destination', '')), fill=text_color, font=font_25)
+    draw.text((x_pos, 1315), str(record.get('To Destination', '')), fill=text_color, font=font_25)
+    draw.text((x_pos, 1392), str(record.get('Number of travels', '')), fill=text_color, font=font_25)
 
     img_byte_arr = io.BytesIO()
     img.save(img_byte_arr, format='JPEG')
