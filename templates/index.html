@@ -10,17 +10,26 @@
         label { display: block; font-weight: bold; margin-bottom: 5px; }
         input { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
         button { background-color: #002b5b; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; width: 100%; font-size: 16px; }
-        .status-box { background: #eef2f7; padding: 15px; border-left: 5px solid #002b5b; margin-top: 10px; border-radius: 4px; }
+        .status-box { background: #eef2f7; padding: 15px; border-left: 5px solid #002b5b; margin-top: 15px; border-radius: 4px; }
         .badge { padding: 4px 8px; border-radius: 4px; color: white; font-weight: bold; display: inline-block; }
         .Pending { background-color: #f0ad4e; }
         .Approved { background-color: #5cb85c; }
+        .Rejected { background-color: #d9534f; }
         .Expired { background-color: #6c757d; }
+        .download-btn { display: inline-block; margin-top: 10px; background-color: #0275d8; color: white; padding: 8px 12px; text-decoration: none; border-radius: 4px; font-weight: bold; }
     </style>
 </head>
 <body>
     <div class="container">
         <h2>Apply for Temporary Bus Pass</h2>
-        {% with messages = get_flashed_messages() %}{% if messages %}{% for msg in messages %}<p style="color: green; font-weight: bold;">{{ msg }}</p>{% endfor %}{% endif %}{% endwith %}
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                {% for msg in messages %}
+                    <p style="color: green; font-weight: bold;">{{ msg }}</p>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
         <form action="/submit" method="POST" enctype="multipart/form-data">
             <div class="form-group"><label>Full Name</label><input type="text" name="name" placeholder="Enter Your Full Name" required></div>
             <div class="form-group"><label>Enrollment Number / MIS ID</label><input type="text" name="enrollment" placeholder="Enter Your University ID" required></div>
@@ -39,10 +48,31 @@
             <button type="submit">Submit Request</button>
         </form>
     </div>
+
     <div class="container">
         <h2>Check Status</h2>
-        <form action="/" method="GET"><input type="email" name="search_email" placeholder="Enter University Email" required><button type="submit">Check</button></form>
-        {% if search_query %}{% for pass in user_passes %}<div class="status-box">Status: <span class="badge {{ pass['Status'] }}">{{ pass['Status'] }}</span> {% if pass['Status'] == 'Approved' %}<a href="/download/{{ pass['ID'] }}">Download Pass</a>{% endif %}</div>{% endfor %}{% endif %}
+        <form action="/" method="GET">
+            <input type="email" name="search_email" placeholder="Enter University Email" required>
+            <button type="submit" style="margin-top: 10px;">Check Status</button>
+        </form>
+
+        {% if search_query %}
+            {% if user_passes %}
+                {% for pass in user_passes %}
+                <div class="status-box">
+                    <p style="margin: 0 0 5px 0;"><strong>Pass ID:</strong> {{ pass['ID'] }}</p>
+                    <p style="margin: 0 0 5px 0;">Status: <span class="badge {{ pass['Status'] }}">{{ pass['Status'] }}</span></p>
+                    {% if pass['Status'] == 'Approved' %}
+                        <a href="/download/{{ pass['ID'] }}" class="download-btn">Download Pass</a>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="status-box" style="border-left-color: #d9534f;">
+                    <p style="margin: 0;">No application found for <strong>{{ search_query }}</strong>. Make sure you entered the exact email used during submission.</p>
+                </div>
+            {% endif %}
+        {% endif %}
     </div>
 </body>
 </html>
