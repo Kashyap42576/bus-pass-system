@@ -68,14 +68,12 @@ def submit_form():
     file = request.files.get('screenshot')
     screenshot_url = ""
     
-    # --- CLOUDINARY API UPLOAD LOGIC ---
     if file:
         try:
             upload_result = cloudinary.uploader.upload(file)
             screenshot_url = upload_result.get('secure_url')
         except Exception as e:
             flash(f"Cloud Upload Failed: {str(e)}")
-            print(f"CRITICAL DEBUG INFO - Cloudinary Error: {str(e)}")
             return redirect(url_for('index'))
 
     pass_id = str(uuid.uuid4())[:8]
@@ -139,7 +137,14 @@ def admin_action(pass_id, action):
     
     cell = SHEET.find(str(pass_id))
     if cell:
-        SHEET.update_cell(cell.row, 15, new_status)
+        # DYNAMICALLY FIND THE 'Status' COLUMN INDEX
+        headers = SHEET.row_values(1)
+        if "Status" in headers:
+            status_col = headers.index("Status") + 1
+        else:
+            status_col = len(headers)  # fallback to last column
+            
+        SHEET.update_cell(cell.row, status_col, new_status)
         
     return redirect(url_for('admin_dashboard'))
 
