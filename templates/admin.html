@@ -25,8 +25,9 @@
                 <th>App Date</th>
                 <th>Validity (From - To)</th>
                 <th>Route (From - To)</th>
-                <th>Shift</th> <!-- NEW SHIFT HEADER -->
+                <th>Shift</th>
                 <th>Travels</th>
+                <th>Photo</th>
                 <th>Screenshot</th>
                 <th>Status</th>
                 <th>Action</th>
@@ -41,11 +42,18 @@
                 <td>{{ req['Date'] }}</td>
                 <td>{{ req['From Date'] }}<br>to<br>{{ req['To Date'] }}</td>
                 <td>{{ req['From Destination'] }}<br>↓<br>{{ req['To Destination'] }}</td>
-                <td>{{ req['Shift'] }}</td> <!-- NEW SHIFT DATA CELL -->
+                <td>{{ req['Shift'] }}</td>
                 <td>{{ req['Number of travels'] }}</td>
                 <td>
+                    {% if req['Passenger Photo URL'] %}
+                        <a href="{{ req['Passenger Photo URL'] }}" target="_blank">View Photo</a>
+                    {% else %}
+                        No Photo
+                    {% endif %}
+                </td>
+                <td>
                     {% if req['Screenshot URL'] %}
-                        <a href="{{ req['Screenshot URL'] }}" target="_blank">View</a>
+                        <a href="{{ req['Screenshot URL'] }}" target="_blank">View Payment</a>
                     {% else %}
                         No Image
                     {% endif %}
