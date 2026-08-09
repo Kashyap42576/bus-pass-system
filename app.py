@@ -31,6 +31,27 @@ except Exception as e:
     print(f"Google Sheets Connection Error: {e}")
     SHEET = None
 
+# --- IMAGE COMPRESSION HELPER ---
+def compress_image(upload_file, max_size=(1024, 1024), quality=70):
+    """
+    Takes a Flask FileStorage object, converts it to RGB, resizes it to 
+    fit within max_size, and compresses it to reduce memory load.
+    """
+    try:
+        img = Image.open(upload_file)
+        img = img.convert("RGB")
+        img.thumbnail(max_size, Image.Resampling.LANCZOS)
+        
+        img_byte_arr = io.BytesIO()
+        img.save(img_byte_arr, format='JPEG', quality=quality)
+        img_byte_arr.seek(0)
+        return img_byte_arr
+    except Exception as e:
+        print(f"Compression failed: {e}")
+        # If compression fails for any reason, return the original file stream
+        upload_file.seek(0)
+        return upload_file
+
 @app.route('/')
 def index():
     search_query = request.args.get('search_email')
@@ -72,19 +93,21 @@ def submit_form():
     screenshot_url = ""
     photo_url = ""
     
-    # 1. Upload Payment Screenshot to Cloudinary
+    # 1. Compress and Upload Payment Screenshot
     if screenshot_file:
         try:
-            upload_result = cloudinary.uploader.upload(screenshot_file)
+            compressed_screenshot = compress_image(screenshot_file)
+            upload_result = cloudinary.uploader.upload(compressed_screenshot)
             screenshot_url = upload_result.get('secure_url')
         except Exception as e:
             flash(f"Payment Screenshot Upload Failed: {str(e)}")
             return redirect(url_for('index'))
 
-    # 2. Upload Passenger Photo to Cloudinary
+    # 2. Compress and Upload Passenger Photo
     if photo_file:
         try:
-            upload_photo_result = cloudinary.uploader.upload(photo_file)
+            compressed_photo = compress_image(photo_file)
+            upload_photo_result = cloudinary.uploader.upload(compressed_photo)
             photo_url = upload_photo_result.get('secure_url')
         except Exception as e:
             flash(f"Passenger Photo Upload Failed: {str(e)}")
@@ -196,7 +219,6 @@ def download_pass(pass_id):
     text_color = (0, 43, 91) # Dark Navy Blue matching template header
     
     # --- 1. PASTE PASSENGER PHOTO ---
-    # Position: X = 743, Y = 270 | Size: 230px (W) x 286px (H)
     photo_url = record.get('Passenger Photo URL')
     if photo_url:
         try:
@@ -209,7 +231,6 @@ def download_pass(pass_id):
             print(f"Error fetching/pasting passenger photo: {e}")
 
     # --- 2. DRAW TEXT VALUES ---
-    # Shared X-Position = 479
     x_pos = 479
     
     draw.text((x_pos, 406), str(record.get('Name', '')), fill=text_color, font=font_25)
