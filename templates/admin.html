@@ -64,9 +64,10 @@
                         <a href="/admin/action/{{ req['ID'] }}/approve" class="btn approve">Approve</a>
                         <a href="/admin/action/{{ req['ID'] }}/reject" class="btn reject">Reject</a>
                     {% elif req['Status'] == 'Approved' %}
-                        <a href="/download/{{ req['ID'] }}" class="btn download">Download</a>
+                        <a href="/admin/download/{{ req['ID'] }}" class="btn download">Download</a>
                     {% elif req['Status'] == 'Expired' %}
-                        <span style="color: gray; font-weight: bold;">Expired</span>
+                        <span style="color: gray; font-weight: bold;">Expired</span><br>
+                        <a href="/admin/download/{{ req['ID'] }}" class="btn download">Download</a>
                     {% endif %}
                 </td>
             </tr>
