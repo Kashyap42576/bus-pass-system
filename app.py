@@ -44,7 +44,6 @@ def get_ist_now():
     return datetime.now(IST)
 
 def is_within_shift(shift_name, now_ist):
-    """Returns (is_allowed, timing_label) for the given shift based on current IST time."""
     config = SHIFT_WINDOWS.get(str(shift_name).strip())
     if not config:
         return False, "No valid shift assigned"
@@ -155,12 +154,11 @@ def index():
             if p.get('Status') == 'Approved' and to_date and to_date < today_ist:
                 p['Status'] = 'Expired'
             
-            # Check if pass should be visible right now based on shift timing
             can_view, shift_label = is_within_shift(p.get('Shift', ''), now_ist)
             p['can_view_now'] = (p.get('Status') == 'Approved' and can_view)
             p['shift_timing_label'] = shift_label
                 
-    return render_template('index.html', user_passes=user_passes, search_query=search_query)
+    return render_template('index.html', user_passes=user_passes, search_query=search_query, today_ist=today_ist)
 
 @app.route('/submit', methods=['POST'])
 def submit_form():
@@ -171,7 +169,7 @@ def submit_form():
     enrollment = request.form.get('enrollment')
     contact = request.form.get('contact')
     email = request.form.get('email')
-    date = request.form.get('date')
+    date = get_ist_now().strftime('%Y-%m-%d')
     institute = request.form.get('institute')
     department = request.form.get('department')
     from_date = request.form.get('from_date')
@@ -181,7 +179,6 @@ def submit_form():
     shift = request.form.get('shift')  
     travels = request.form.get('travels')
 
-    # Validate Shift selection on server side as well
     if shift not in SHIFT_WINDOWS:
         flash("Please select a valid Shift.")
         return redirect(url_for('index'))
@@ -244,7 +241,6 @@ def submit_form():
 
 @app.route('/view_pass/<pass_id>')
 def view_pass(pass_id):
-    """Inline pass viewer for passengers. Enforces approval, To Date expiry, and shift timings."""
     if not SHEET:
         return "Database error.", 500
         
@@ -309,7 +305,6 @@ def admin_action(pass_id, action):
 
 @app.route('/admin/download/<pass_id>')
 def admin_download_pass(pass_id):
-    """Admin-only route to download any pass regardless of shift timing."""
     if not check_admin_auth():
         return Response('Access Denied', 401, {'WWW-Authenticate': 'Basic realm="Login Required"'})
     if not SHEET:
