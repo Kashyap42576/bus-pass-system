@@ -2,8 +2,8 @@ import os
 import uuid
 import io
 import requests
-from datetime import datetime
-from flask import Flask, render_template, request, redirect, url_for, send_file, flash, Response
+from datetime import datetime, time, timezone, timedelta
+from flask import Flask, render_template, request, redirect, url_for, send_file, flash, Response, make_response
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from PIL import Image, ImageDraw, ImageFont
@@ -21,6 +21,43 @@ cloudinary.config(
 app = Flask(__name__)
 app.secret_key = "super_secret_bus_pass_key"
 
+# --- IST TIMEZONE (UTC+5:30) ---
+IST = timezone(timedelta(hours=5, minutes=30))
+
+# --- SHIFT TIMINGS CONFIGURATION ---
+SHIFT_WINDOWS = {
+    "Morning Shift": {
+        "ranges": [(time(4, 30), time(8, 0)), (time(13, 0), time(16, 0))],
+        "label": "4:30 AM to 8:00 AM & 1:00 PM to 4:00 PM"
+    },
+    "General Shift": {
+        "ranges": [(time(7, 30), time(10, 0)), (time(16, 0), time(18, 30))],
+        "label": "7:30 AM to 10:00 AM & 4:00 PM to 6:30 PM"
+    },
+    "Admin Shift": {
+        "ranges": [(time(7, 0), time(9, 30)), (time(16, 30), time(19, 30))],
+        "label": "7:00 AM to 9:30 AM & 4:30 PM to 7:30 PM"
+    }
+}
+
+def get_ist_now():
+    return datetime.now(IST)
+
+def is_within_shift(shift_name, now_ist):
+    """Returns (is_allowed, timing_label) for the given shift based on current IST time."""
+    config = SHIFT_WINDOWS.get(str(shift_name).strip())
+    if not config:
+        return False, "No valid shift assigned"
+    current_t = now_ist.time()
+    for start_t, end_t in config["ranges"]:
+        if start_t <= current_t <= end_t:
+            return True, config["label"]
+    return False, config["label"]
+
+def check_admin_auth():
+    auth = request.authorization
+    return auth and auth.username == 'admin' and auth.password == 'supersecret'
+
 # --- GOOGLE SHEETS CONFIGURATION ---
 SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 try:
@@ -33,10 +70,6 @@ except Exception as e:
 
 # --- IMAGE COMPRESSION HELPER ---
 def compress_image(upload_file, max_size=(1024, 1024), quality=70):
-    """
-    Takes a Flask FileStorage object, converts it to RGB, resizes it to 
-    fit within max_size, and compresses it to reduce memory load.
-    """
     try:
         img = Image.open(upload_file)
         img = img.convert("RGB")
@@ -48,23 +81,84 @@ def compress_image(upload_file, max_size=(1024, 1024), quality=70):
         return img_byte_arr
     except Exception as e:
         print(f"Compression failed: {e}")
-        # If compression fails for any reason, return the original file stream
         upload_file.seek(0)
         return upload_file
+
+# --- PASS IMAGE GENERATOR HELPER ---
+def generate_pass_image(record):
+    template_path = "temporary-bus-pass.jpg"
+    img = Image.open(template_path).convert("RGB")
+    draw = ImageDraw.Draw(img)
+    
+    try:
+        font_25 = ImageFont.truetype("Roboto-Bold.ttf", 25)
+        font_20 = ImageFont.truetype("Roboto-Bold.ttf", 20)
+    except IOError:
+        font_25 = ImageFont.load_default()
+        font_20 = ImageFont.load_default()
+
+    text_color = (0, 43, 91)
+    
+    # 1. Paste Passenger Photo
+    photo_url = record.get('Passenger Photo URL')
+    if photo_url:
+        try:
+            photo_response = requests.get(photo_url, stream=True)
+            if photo_response.status_code == 200:
+                passenger_img = Image.open(photo_response.raw).convert("RGB")
+                passenger_img = passenger_img.resize((230, 286), Image.Resampling.LANCZOS)
+                img.paste(passenger_img, (743, 270))
+        except Exception as e:
+            print(f"Error fetching/pasting passenger photo: {e}")
+
+    # 2. Draw Text Values
+    x_pos = 479
+    draw.text((x_pos, 406), str(record.get('Name', '')), fill=text_color, font=font_25)
+    draw.text((x_pos, 493), str(record.get('Enrollment ID', '')), fill=text_color, font=font_25)
+    draw.text((x_pos, 582), str(record.get('Contact Number', '')), fill=text_color, font=font_25)
+    draw.text((x_pos, 676), str(record.get('University Email', '')), fill=text_color, font=font_20)
+    draw.text((x_pos, 763), str(record.get('Date', '')), fill=text_color, font=font_25)
+    draw.text((x_pos, 874), str(record.get('Institute', '')), fill=text_color, font=font_25)
+    draw.text((x_pos, 960), str(record.get('Department', '')), fill=text_color, font=font_25)
+    draw.text((x_pos, 1052), str(record.get('From Date', '')), fill=text_color, font=font_25)
+    draw.text((x_pos, 1142), str(record.get('To Date', '')), fill=text_color, font=font_25)
+    draw.text((x_pos, 1229), str(record.get('From Destination', '')), fill=text_color, font=font_25)
+    draw.text((x_pos, 1315), str(record.get('To Destination', '')), fill=text_color, font=font_25)
+    draw.text((x_pos, 1392), str(record.get('Number of travels', '')), fill=text_color, font=font_25)
+
+    img_byte_arr = io.BytesIO()
+    img.save(img_byte_arr, format='JPEG')
+    img_byte_arr.seek(0)
+    return img_byte_arr
+
+def get_record_by_id(pass_id):
+    cell = SHEET.find(str(pass_id))
+    if not cell:
+        return None
+    row_data = SHEET.row_values(cell.row)
+    headers = SHEET.row_values(1)
+    return dict(zip(headers, row_data))
 
 @app.route('/')
 def index():
     search_query = request.args.get('search_email')
     user_passes = []
+    now_ist = get_ist_now()
+    today_ist = now_ist.strftime('%Y-%m-%d')
     
     if search_query and SHEET:
         all_records = SHEET.get_all_records()
         user_passes = [r for r in all_records if str(r.get('University Email')).strip().lower() == search_query.strip().lower()]
         
-        today = datetime.now().strftime('%Y-%m-%d')
         for p in user_passes:
-            if p.get('Status') == 'Approved' and p.get('To Date', '') < today:
+            to_date = str(p.get('To Date', '')).strip()
+            if p.get('Status') == 'Approved' and to_date and to_date < today_ist:
                 p['Status'] = 'Expired'
+            
+            # Check if pass should be visible right now based on shift timing
+            can_view, shift_label = is_within_shift(p.get('Shift', ''), now_ist)
+            p['can_view_now'] = (p.get('Status') == 'Approved' and can_view)
+            p['shift_timing_label'] = shift_label
                 
     return render_template('index.html', user_passes=user_passes, search_query=search_query)
 
@@ -86,6 +180,11 @@ def submit_form():
     to_dest = request.form.get('to_dest')
     shift = request.form.get('shift')  
     travels = request.form.get('travels')
+
+    # Validate Shift selection on server side as well
+    if shift not in SHIFT_WINDOWS:
+        flash("Please select a valid Shift.")
+        return redirect(url_for('index'))
     
     screenshot_file = request.files.get('screenshot')
     photo_file = request.files.get('passenger_photo')
@@ -93,7 +192,6 @@ def submit_form():
     screenshot_url = ""
     photo_url = ""
     
-    # 1. Compress and Upload Payment Screenshot
     if screenshot_file:
         try:
             compressed_screenshot = compress_image(screenshot_file)
@@ -103,7 +201,6 @@ def submit_form():
             flash(f"Payment Screenshot Upload Failed: {str(e)}")
             return redirect(url_for('index'))
 
-    # 2. Compress and Upload Passenger Photo
     if photo_file:
         try:
             compressed_photo = compress_image(photo_file)
@@ -114,7 +211,6 @@ def submit_form():
             return redirect(url_for('index'))
 
     pass_id = str(uuid.uuid4())[:8]
-    
     headers = SHEET.row_values(1)
     
     form_data_map = {
@@ -138,7 +234,6 @@ def submit_form():
     }
     
     row_data = [form_data_map.get(str(header).strip(), "") for header in headers]
-    
     if not headers or len(headers) < 5:
         row_data = [pass_id, name, enrollment, contact, email, date, institute, department, from_date, to_date, from_dest, to_dest, shift, travels, photo_url, screenshot_url, "Pending"]
 
@@ -147,26 +242,57 @@ def submit_form():
     flash("Application submitted successfully!")
     return redirect(url_for('index'))
 
+@app.route('/view_pass/<pass_id>')
+def view_pass(pass_id):
+    """Inline pass viewer for passengers. Enforces approval, To Date expiry, and shift timings."""
+    if not SHEET:
+        return "Database error.", 500
+        
+    record = get_record_by_id(pass_id)
+    if not record:
+        return "Pass not found.", 404
+        
+    now_ist = get_ist_now()
+    today_ist = now_ist.strftime('%Y-%m-%d')
+    to_date = str(record.get('To Date', '')).strip()
+    
+    if record.get('Status') != 'Approved':
+        return "Unauthorized. Pass is not approved.", 403
+    if to_date and to_date < today_ist:
+        return "Unauthorized. This pass has expired.", 403
+        
+    can_view, shift_label = is_within_shift(record.get('Shift', ''), now_ist)
+    if not can_view:
+        return f"Unauthorized. Pass is only visible during your shift timings ({shift_label}).", 403
+
+    img_byte_arr = generate_pass_image(record)
+    response = make_response(send_file(img_byte_arr, mimetype='image/jpeg', as_attachment=False))
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    return response
+
 @app.route('/admin')
 def admin_dashboard():
-    auth = request.authorization
-    if not auth or auth.username != 'admin' or auth.password != 'supersecret':
+    if not check_admin_auth():
         return Response('Access Denied', 401, {'WWW-Authenticate': 'Basic realm="Login Required"'})
     
     if not SHEET:
         return "Database connection error.", 500
         
     requests_list = SHEET.get_all_records()
+    today_ist = get_ist_now().strftime('%Y-%m-%d')
     
-    today = datetime.now().strftime('%Y-%m-%d')
     for req in requests_list:
-        if req.get('Status') == 'Approved' and req.get('To Date', '') < today:
+        to_date = str(req.get('To Date', '')).strip()
+        if req.get('Status') == 'Approved' and to_date and to_date < today_ist:
             req['Status'] = 'Expired'
             
     return render_template('admin.html', requests=requests_list)
 
 @app.route('/admin/action/<pass_id>/<action>')
 def admin_action(pass_id, action):
+    if not check_admin_auth():
+        return Response('Access Denied', 401, {'WWW-Authenticate': 'Basic realm="Login Required"'})
     if not SHEET:
         return "Database error.", 500
         
@@ -176,81 +302,30 @@ def admin_action(pass_id, action):
     cell = SHEET.find(str(pass_id))
     if cell:
         headers = SHEET.row_values(1)
-        if "Status" in headers:
-            status_col = headers.index("Status") + 1
-        else:
-            status_col = len(headers)
-            
+        status_col = headers.index("Status") + 1 if "Status" in headers else len(headers)
         SHEET.update_cell(cell.row, status_col, new_status)
         
     return redirect(url_for('admin_dashboard'))
 
-@app.route('/download/<pass_id>')
-def download_pass(pass_id):
+@app.route('/admin/download/<pass_id>')
+def admin_download_pass(pass_id):
+    """Admin-only route to download any pass regardless of shift timing."""
+    if not check_admin_auth():
+        return Response('Access Denied', 401, {'WWW-Authenticate': 'Basic realm="Login Required"'})
     if not SHEET:
         return "Database error.", 500
         
-    cell = SHEET.find(str(pass_id))
-    if not cell:
+    record = get_record_by_id(pass_id)
+    if not record:
         return "Pass not found.", 404
-        
-    row_data = SHEET.row_values(cell.row)
-    headers = SHEET.row_values(1)
-    record = dict(zip(headers, row_data))
-    
-    today = datetime.now().strftime('%Y-%m-%d')
-    if record.get('Status') != 'Approved':
-        return "Unauthorized. Pass is not approved.", 403
-    if record.get('To Date', '') < today:
-        return "Unauthorized. This pass has expired.", 403
 
-    template_path = "temporary-bus-pass.jpg"
-    img = Image.open(template_path).convert("RGB")
-    draw = ImageDraw.Draw(img)
-    
-    # --- FONTS SETUP ---
-    try:
-        font_25 = ImageFont.truetype("Roboto-Bold.ttf", 25)
-        font_20 = ImageFont.truetype("Roboto-Bold.ttf", 20)
-    except IOError:
-        font_25 = ImageFont.load_default()
-        font_20 = ImageFont.load_default()
-
-    text_color = (0, 43, 91) # Dark Navy Blue matching template header
-    
-    # --- 1. PASTE PASSENGER PHOTO ---
-    photo_url = record.get('Passenger Photo URL')
-    if photo_url:
-        try:
-            photo_response = requests.get(photo_url, stream=True)
-            if photo_response.status_code == 200:
-                passenger_img = Image.open(photo_response.raw).convert("RGB")
-                passenger_img = passenger_img.resize((230, 286), Image.Resampling.LANCZOS)
-                img.paste(passenger_img, (743, 270))
-        except Exception as e:
-            print(f"Error fetching/pasting passenger photo: {e}")
-
-    # --- 2. DRAW TEXT VALUES ---
-    x_pos = 479
-    
-    draw.text((x_pos, 406), str(record.get('Name', '')), fill=text_color, font=font_25)
-    draw.text((x_pos, 493), str(record.get('Enrollment ID', '')), fill=text_color, font=font_25)
-    draw.text((x_pos, 582), str(record.get('Contact Number', '')), fill=text_color, font=font_25)
-    draw.text((x_pos, 676), str(record.get('University Email', '')), fill=text_color, font=font_20)
-    draw.text((x_pos, 763), str(record.get('Date', '')), fill=text_color, font=font_25)
-    draw.text((x_pos, 874), str(record.get('Institute', '')), fill=text_color, font=font_25)
-    draw.text((x_pos, 960), str(record.get('Department', '')), fill=text_color, font=font_25)
-    draw.text((x_pos, 1052), str(record.get('From Date', '')), fill=text_color, font=font_25)
-    draw.text((x_pos, 1142), str(record.get('To Date', '')), fill=text_color, font=font_25)
-    draw.text((x_pos, 1229), str(record.get('From Destination', '')), fill=text_color, font=font_25)
-    draw.text((x_pos, 1315), str(record.get('To Destination', '')), fill=text_color, font=font_25)
-    draw.text((x_pos, 1392), str(record.get('Number of travels', '')), fill=text_color, font=font_25)
-
-    img_byte_arr = io.BytesIO()
-    img.save(img_byte_arr, format='JPEG')
-    img_byte_arr.seek(0)
-    
-    return send_file(img_byte_arr, mimetype='image/jpeg', as_attachment=True, download_name=f"BusPass_{record.get('Enrollment ID')}.jpg")
+    img_byte_arr = generate_pass_image(record)
+    return send_file(
+        img_byte_arr,
+        mimetype='image/jpeg',
+        as_attachment=True,
+        download_name=f"BusPass_{record.get('Enrollment ID')}.jpg"
+    )
 
 if __name__ == '__main__':
     app.run(debug=True)
