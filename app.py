@@ -24,6 +24,12 @@ app.secret_key = "super_secret_bus_pass_key"
 # --- IST TIMEZONE (UTC+5:30) ---
 IST = timezone(timedelta(hours=5, minutes=30))
 
+# --- ALLOWED CITIES ---
+ALLOWED_CITIES = {
+    "Vadodara", "Nadiad", "Anand", "Bharuch",
+    "Karjan", "Dabhoi", "Halol", "Godhra"
+}
+
 # --- SHIFT TIMINGS CONFIGURATION ---
 SHIFT_WINDOWS = {
     "Morning Shift": {
@@ -42,6 +48,9 @@ SHIFT_WINDOWS = {
 
 def get_ist_now():
     return datetime.now(IST)
+
+def get_travel_date(record):
+    return str(record.get('Date of Travel') or record.get('From Date') or record.get('To Date') or '').strip()
 
 def is_within_shift(shift_name, now_ist):
     config = SHIFT_WINDOWS.get(str(shift_name).strip())
@@ -119,11 +128,10 @@ def generate_pass_image(record):
     draw.text((x_pos, 763), str(record.get('Date', '')), fill=text_color, font=font_25)
     draw.text((x_pos, 874), str(record.get('Institute', '')), fill=text_color, font=font_25)
     draw.text((x_pos, 960), str(record.get('Department', '')), fill=text_color, font=font_25)
-    draw.text((x_pos, 1052), str(record.get('From Date', '')), fill=text_color, font=font_25)
-    draw.text((x_pos, 1142), str(record.get('To Date', '')), fill=text_color, font=font_25)
+    draw.text((x_pos, 1052), get_travel_date(record), fill=text_color, font=font_25)
     draw.text((x_pos, 1229), str(record.get('From Destination', '')), fill=text_color, font=font_25)
     draw.text((x_pos, 1315), str(record.get('To Destination', '')), fill=text_color, font=font_25)
-    draw.text((x_pos, 1392), str(record.get('Number of travels', '')), fill=text_color, font=font_25)
+    draw.text((x_pos, 1392), str(record.get('Number of travels', '1')), fill=text_color, font=font_25)
 
     img_byte_arr = io.BytesIO()
     img.save(img_byte_arr, format='JPEG')
@@ -150,8 +158,9 @@ def index():
         user_passes = [r for r in all_records if str(r.get('University Email')).strip().lower() == search_query.strip().lower()]
         
         for p in user_passes:
-            to_date = str(p.get('To Date', '')).strip()
-            if p.get('Status') == 'Approved' and to_date and to_date < today_ist:
+            travel_date = get_travel_date(p)
+            p['display_travel_date'] = travel_date
+            if p.get('Status') == 'Approved' and travel_date and travel_date < today_ist:
                 p['Status'] = 'Expired'
             
             can_view, shift_label = is_within_shift(p.get('Shift', ''), now_ist)
@@ -172,16 +181,40 @@ def submit_form():
     date = get_ist_now().strftime('%Y-%m-%d')
     institute = request.form.get('institute')
     department = request.form.get('department')
-    from_date = request.form.get('from_date')
-    to_date = request.form.get('to_date')
-    from_dest = request.form.get('from_dest')
-    to_dest = request.form.get('to_dest')
-    shift = request.form.get('shift')  
-    travels = request.form.get('travels')
+    travel_date = request.form.get('travel_date')
+    shift = request.form.get('shift')
+    travels = "1"  # Locked to 1
 
+    # Validate Shift
     if shift not in SHIFT_WINDOWS:
         flash("Please select a valid Shift.")
         return redirect(url_for('index'))
+
+    # Resolve & Validate From / To Destinations
+    from_dest_type = request.form.get('from_dest_type')
+    to_dest_type = request.form.get('to_dest_type')
+    from_city = request.form.get('from_city')
+    to_city = request.form.get('to_city')
+
+    if from_dest_type not in ("Parul University", "City") or to_dest_type not in ("Parul University", "City") or from_dest_type == to_dest_type:
+        flash("Please select valid From and To destinations (Parul University and City).")
+        return redirect(url_for('index'))
+
+    if from_dest_type == "Parul University":
+        from_dest = "Parul University"
+    else:
+        if from_city not in ALLOWED_CITIES:
+            flash("Please select a valid From City.")
+            return redirect(url_for('index'))
+        from_dest = from_city
+
+    if to_dest_type == "Parul University":
+        to_dest = "Parul University"
+    else:
+        if to_city not in ALLOWED_CITIES:
+            flash("Please select a valid To City.")
+            return redirect(url_for('index'))
+        to_dest = to_city
     
     screenshot_file = request.files.get('screenshot')
     photo_file = request.files.get('passenger_photo')
@@ -219,11 +252,11 @@ def submit_form():
         "Date": date,
         "Institute": institute,
         "Department": department,
-        "From Date": from_date,
-        "To Date": to_date,
+        "Date of Travel": travel_date,
+        "From Date": travel_date,
         "From Destination": from_dest,
         "To Destination": to_dest,
-        "Shift": shift,  
+        "Shift": shift,
         "Number of travels": travels,
         "Passenger Photo URL": photo_url,
         "Screenshot URL": screenshot_url,
@@ -232,7 +265,7 @@ def submit_form():
     
     row_data = [form_data_map.get(str(header).strip(), "") for header in headers]
     if not headers or len(headers) < 5:
-        row_data = [pass_id, name, enrollment, contact, email, date, institute, department, from_date, to_date, from_dest, to_dest, shift, travels, photo_url, screenshot_url, "Pending"]
+        row_data = [pass_id, name, enrollment, contact, email, date, institute, department, travel_date, from_dest, to_dest, shift, travels, photo_url, screenshot_url, "Pending"]
 
     SHEET.append_row(row_data)
     
@@ -250,11 +283,11 @@ def view_pass(pass_id):
         
     now_ist = get_ist_now()
     today_ist = now_ist.strftime('%Y-%m-%d')
-    to_date = str(record.get('To Date', '')).strip()
+    travel_date = get_travel_date(record)
     
     if record.get('Status') != 'Approved':
         return "Unauthorized. Pass is not approved.", 403
-    if to_date and to_date < today_ist:
+    if travel_date and travel_date < today_ist:
         return "Unauthorized. This pass has expired.", 403
         
     can_view, shift_label = is_within_shift(record.get('Shift', ''), now_ist)
@@ -279,8 +312,9 @@ def admin_dashboard():
     today_ist = get_ist_now().strftime('%Y-%m-%d')
     
     for req in requests_list:
-        to_date = str(req.get('To Date', '')).strip()
-        if req.get('Status') == 'Approved' and to_date and to_date < today_ist:
+        travel_date = get_travel_date(req)
+        req['display_travel_date'] = travel_date
+        if req.get('Status') == 'Approved' and travel_date and travel_date < today_ist:
             req['Status'] = 'Expired'
             
     return render_template('admin.html', requests=requests_list)
