@@ -30,21 +30,41 @@ ALLOWED_CITIES = {
     "Karjan", "Dabhoi", "Halol", "Godhra"
 }
 
-# --- SHIFT TIMINGS CONFIGURATION ---
+# --- SHIFT & TIME OF TRAVEL CONFIGURATION (IST) ---
 SHIFT_WINDOWS = {
     "Morning Shift": {
-        "ranges": [(time(4, 30), time(8, 0)), (time(13, 0), time(16, 0))],
-        "label": "4:30 AM to 8:00 AM & 1:00 PM to 4:00 PM"
+        "Morning": {
+            "range": (time(4, 30), time(8, 0)),
+            "label": "4:30 AM – 8:00 AM"
+        },
+        "Afternoon": {
+            "range": (time(13, 0), time(16, 0)),
+            "label": "1:00 PM – 4:00 PM"
+        }
     },
     "General Shift": {
-        "ranges": [(time(7, 30), time(10, 0)), (time(16, 0), time(18, 30))],
-        "label": "7:30 AM to 10:00 AM & 4:00 PM to 6:30 PM"
+        "Morning": {
+            "range": (time(7, 30), time(10, 0)),
+            "label": "7:30 AM – 10:00 AM"
+        },
+        "Afternoon": {
+            "range": (time(16, 0), time(18, 30)),
+            "label": "4:00 PM – 6:30 PM"
+        }
     },
     "Admin Shift": {
-        "ranges": [(time(7, 0), time(9, 30)), (time(16, 30), time(19, 30))],
-        "label": "7:00 AM to 9:30 AM & 4:30 PM to 7:30 PM"
+        "Morning": {
+            "range": (time(7, 0), time(9, 30)),
+            "label": "7:00 AM – 9:30 AM"
+        },
+        "Afternoon": {
+            "range": (time(16, 30), time(19, 30)),
+            "label": "4:30 PM – 7:30 PM"
+        }
     }
 }
+
+ALLOWED_TRAVEL_TIMES = {"Morning", "Afternoon"}
 
 def get_ist_now():
     return datetime.now(IST)
@@ -52,15 +72,16 @@ def get_ist_now():
 def get_travel_date(record):
     return str(record.get('Date of Travel') or record.get('From Date') or record.get('To Date') or '').strip()
 
-def is_within_shift(shift_name, now_ist):
-    config = SHIFT_WINDOWS.get(str(shift_name).strip())
-    if not config:
+def is_within_allowed_window(shift_name, time_of_travel, now_ist):
+    shift_cfg = SHIFT_WINDOWS.get(str(shift_name).strip())
+    if not shift_cfg:
         return False, "No valid shift assigned"
+    slot_cfg = shift_cfg.get(str(time_of_travel).strip())
+    if not slot_cfg:
+        return False, "No valid travel time assigned"
+    start_t, end_t = slot_cfg["range"]
     current_t = now_ist.time()
-    for start_t, end_t in config["ranges"]:
-        if start_t <= current_t <= end_t:
-            return True, config["label"]
-    return False, config["label"]
+    return (start_t <= current_t <= end_t), slot_cfg["label"]
 
 def check_admin_auth():
     auth = request.authorization
@@ -163,9 +184,13 @@ def index():
             if p.get('Status') == 'Approved' and travel_date and travel_date < today_ist:
                 p['Status'] = 'Expired'
             
-            can_view, shift_label = is_within_shift(p.get('Shift', ''), now_ist)
+            can_view, timing_label = is_within_allowed_window(
+                p.get('Shift', ''),
+                p.get('Time of Travel', ''),
+                now_ist
+            )
             p['can_view_now'] = (p.get('Status') == 'Approved' and can_view)
-            p['shift_timing_label'] = shift_label
+            p['shift_timing_label'] = timing_label
                 
     return render_template('index.html', user_passes=user_passes, search_query=search_query, today_ist=today_ist)
 
@@ -183,11 +208,16 @@ def submit_form():
     department = request.form.get('department')
     travel_date = request.form.get('travel_date')
     shift = request.form.get('shift')
-    travels = "1"  # Locked to 1
+    time_of_travel = request.form.get('time_of_travel')
+    travels = "1"
 
-    # Validate Shift
+    # Validate Shift & Time of Travel
     if shift not in SHIFT_WINDOWS:
         flash("Please select a valid Shift.")
+        return redirect(url_for('index'))
+
+    if time_of_travel not in ALLOWED_TRAVEL_TIMES:
+        flash("Please select a valid Time of Travel.")
         return redirect(url_for('index'))
 
     # Resolve & Validate From / To Destinations
@@ -257,6 +287,7 @@ def submit_form():
         "From Destination": from_dest,
         "To Destination": to_dest,
         "Shift": shift,
+        "Time of Travel": time_of_travel,
         "Number of travels": travels,
         "Passenger Photo URL": photo_url,
         "Screenshot URL": screenshot_url,
@@ -265,7 +296,7 @@ def submit_form():
     
     row_data = [form_data_map.get(str(header).strip(), "") for header in headers]
     if not headers or len(headers) < 5:
-        row_data = [pass_id, name, enrollment, contact, email, date, institute, department, travel_date, from_dest, to_dest, shift, travels, photo_url, screenshot_url, "Pending"]
+        row_data = [pass_id, name, enrollment, contact, email, date, institute, department, travel_date, from_dest, to_dest, shift, time_of_travel, travels, photo_url, screenshot_url, "Pending"]
 
     SHEET.append_row(row_data)
     
@@ -290,9 +321,13 @@ def view_pass(pass_id):
     if travel_date and travel_date < today_ist:
         return "Unauthorized. This pass has expired.", 403
         
-    can_view, shift_label = is_within_shift(record.get('Shift', ''), now_ist)
+    can_view, timing_label = is_within_allowed_window(
+        record.get('Shift', ''),
+        record.get('Time of Travel', ''),
+        now_ist
+    )
     if not can_view:
-        return f"Unauthorized. Pass is only visible during your shift timings ({shift_label}).", 403
+        return f"Unauthorized. Pass is only visible during your allotted timings ({timing_label}).", 403
 
     img_byte_arr = generate_pass_image(record)
     response = make_response(send_file(img_byte_arr, mimetype='image/jpeg', as_attachment=False))
