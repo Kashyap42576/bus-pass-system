@@ -25,7 +25,7 @@
                 <th>App Date</th>
                 <th>Date of Travel</th>
                 <th>Route (From - To)</th>
-                <th>Shift</th>
+                <th>Shift / Time</th>
                 <th>Travels</th>
                 <th>Photo</th>
                 <th>Screenshot</th>
@@ -42,7 +42,7 @@
                 <td>{{ req['Date'] }}</td>
                 <td>{{ req['display_travel_date'] }}</td>
                 <td>{{ req['From Destination'] }}<br>↓<br>{{ req['To Destination'] }}</td>
-                <td>{{ req['Shift'] }}</td>
+                <td>{{ req['Shift'] }}<br><small>{{ req['Time of Travel'] }}</small></td>
                 <td>{{ req['Number of travels'] }}</td>
                 <td>
                     {% if req['Passenger Photo URL'] %}
