@@ -30,31 +30,29 @@ ALLOWED_CITIES = {
     "Karjan", "Dabhoi", "Halol", "Godhra"
 }
 
-# --- SHIFT & TIME OF TRAVEL CONFIGURATION (IST) ---
+# --- SHIFT & ROUTE-BASED TIMINGS (IST) ---
 SHIFT_WINDOWS = {
     "Morning Shift": {
-        "Morning": {
+        "from_city": {
             "range": (time(4, 30), time(8, 0)),
             "label": "4:30 AM – 8:00 AM"
         },
-        "Afternoon": {
+        "from_pu": {
             "range": (time(13, 0), time(16, 0)),
             "label": "1:00 PM – 4:00 PM"
         }
     },
     "Admin Shift": {
-        "Morning": {
+        "from_city": {
             "range": (time(7, 0), time(9, 30)),
             "label": "7:00 AM – 9:30 AM"
         },
-        "Afternoon": {
+        "from_pu": {
             "range": (time(16, 30), time(19, 30)),
             "label": "4:30 PM – 7:30 PM"
         }
     }
 }
-
-ALLOWED_TRAVEL_TIMES = {"Morning", "Afternoon"}
 
 def get_ist_now():
     return datetime.now(IST)
@@ -62,13 +60,19 @@ def get_ist_now():
 def get_travel_date(record):
     return str(record.get('Date of Travel') or record.get('From Date') or record.get('To Date') or '').strip()
 
-def is_within_allowed_window(shift_name, time_of_travel, now_ist):
+def is_within_allowed_window(shift_name, from_dest, now_ist):
     shift_cfg = SHIFT_WINDOWS.get(str(shift_name).strip())
     if not shift_cfg:
         return False, "No valid shift assigned"
-    slot_cfg = shift_cfg.get(str(time_of_travel).strip())
-    if not slot_cfg:
-        return False, "No valid travel time assigned"
+
+    from_clean = str(from_dest).strip()
+    if from_clean == "Parul University":
+        slot_cfg = shift_cfg["from_pu"]
+    elif from_clean in ALLOWED_CITIES:
+        slot_cfg = shift_cfg["from_city"]
+    else:
+        return False, "No valid starting destination assigned"
+
     start_t, end_t = slot_cfg["range"]
     current_t = now_ist.time()
     return (start_t <= current_t <= end_t), slot_cfg["label"]
@@ -176,7 +180,7 @@ def index():
             
             can_view, timing_label = is_within_allowed_window(
                 p.get('Shift', ''),
-                p.get('Time of Travel', ''),
+                p.get('From Destination', ''),
                 now_ist
             )
             p['can_view_now'] = (p.get('Status') == 'Approved' and can_view)
@@ -198,16 +202,11 @@ def submit_form():
     department = request.form.get('department')
     travel_date = request.form.get('travel_date')
     shift = request.form.get('shift')
-    time_of_travel = request.form.get('time_of_travel')
     travels = "1"
 
-    # Validate Shift & Time of Travel
+    # Validate Shift
     if shift not in SHIFT_WINDOWS:
         flash("Please select a valid Shift.")
-        return redirect(url_for('index'))
-
-    if time_of_travel not in ALLOWED_TRAVEL_TIMES:
-        flash("Please select a valid Time of Travel.")
         return redirect(url_for('index'))
 
     # Resolve & Validate From / To Destinations
@@ -277,7 +276,6 @@ def submit_form():
         "From Destination": from_dest,
         "To Destination": to_dest,
         "Shift": shift,
-        "Time of Travel": time_of_travel,
         "Number of travels": travels,
         "Passenger Photo URL": photo_url,
         "Screenshot URL": screenshot_url,
@@ -286,7 +284,7 @@ def submit_form():
     
     row_data = [form_data_map.get(str(header).strip(), "") for header in headers]
     if not headers or len(headers) < 5:
-        row_data = [pass_id, name, enrollment, contact, email, date, institute, department, travel_date, from_dest, to_dest, shift, time_of_travel, travels, photo_url, screenshot_url, "Pending"]
+        row_data = [pass_id, name, enrollment, contact, email, date, institute, department, travel_date, from_dest, to_dest, shift, travels, photo_url, screenshot_url, "Pending"]
 
     SHEET.append_row(row_data)
     
@@ -313,7 +311,7 @@ def view_pass(pass_id):
         
     can_view, timing_label = is_within_allowed_window(
         record.get('Shift', ''),
-        record.get('Time of Travel', ''),
+        record.get('From Destination', ''),
         now_ist
     )
     if not can_view:
