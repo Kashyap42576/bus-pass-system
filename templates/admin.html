@@ -23,7 +23,7 @@
                 <th>Name / Enrollment</th>
                 <th>Email / Contact</th>
                 <th>App Date</th>
-                <th>Validity (From - To)</th>
+                <th>Date of Travel</th>
                 <th>Route (From - To)</th>
                 <th>Shift</th>
                 <th>Travels</th>
@@ -40,7 +40,7 @@
                 <td><strong>{{ req['Name'] }}</strong><br><small>{{ req['Enrollment ID'] }}</small></td>
                 <td>{{ req['University Email'] }}<br><small>{{ req['Contact Number'] }}</small></td>
                 <td>{{ req['Date'] }}</td>
-                <td>{{ req['From Date'] }}<br>to<br>{{ req['To Date'] }}</td>
+                <td>{{ req['display_travel_date'] }}</td>
                 <td>{{ req['From Destination'] }}<br>↓<br>{{ req['To Destination'] }}</td>
                 <td>{{ req['Shift'] }}</td>
                 <td>{{ req['Number of travels'] }}</td>
