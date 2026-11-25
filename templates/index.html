@@ -128,6 +128,16 @@
 
             <div class="form-group"><label>Passenger Photo</label><input type="file" name="passenger_photo" accept="image/*" required></div>
             <div class="form-group"><label>Payment Screenshot</label><input type="file" name="screenshot" accept="image/*" required></div>
+
+            <div class="form-group">
+                <label>Time of Travel</label>
+                <select name="time_of_travel" required>
+                    <option value="" disabled selected>Select Time of Travel</option>
+                    <option value="Morning">Morning</option>
+                    <option value="Afternoon">Afternoon</option>
+                </select>
+            </div>
+
             <button type="submit">Submit Request</button>
         </form>
     </div>
@@ -144,7 +154,7 @@
                 {% for pass in user_passes %}
                 <div class="status-box">
                     <p style="margin: 0 0 5px 0;"><strong>Pass ID:</strong> {{ pass['ID'] }}</p>
-                    <p style="margin: 0 0 5px 0;"><strong>Shift:</strong> {{ pass['Shift'] }}</p>
+                    <p style="margin: 0 0 5px 0;"><strong>Shift:</strong> {{ pass['Shift'] }} ({{ pass['Time of Travel'] }})</p>
                     <p style="margin: 0 0 5px 0;"><strong>Date of Travel:</strong> {{ pass['display_travel_date'] }}</p>
                     <p style="margin: 0 0 5px 0;">Status: <span class="badge {{ pass['Status'] }}">{{ pass['Status'] }}</span></p>
                     
@@ -156,7 +166,7 @@
                             </div>
                         {% else %}
                             <div class="shift-notice">
-                                Your pass is <strong>Approved</strong>, but it is only visible during your allotted <strong>{{ pass['Shift'] }}</strong> timings:<br>
+                                Your pass is <strong>Approved</strong>, but it is only visible during your allotted <strong>{{ pass['Shift'] }} ({{ pass['Time of Travel'] }})</strong> timing:<br>
                                 <strong>{{ pass['shift_timing_label'] }}</strong>
                             </div>
                         {% endif %}
