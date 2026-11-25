@@ -26,7 +26,7 @@ IST = timezone(timedelta(hours=5, minutes=30))
 
 # --- ALLOWED CITIES ---
 ALLOWED_CITIES = {
-    "Vadodara", "Nadiad", "Anand", "Bharuch",
+    "Nadiad", "Anand", "Bharuch",
     "Karjan", "Dabhoi", "Halol", "Godhra"
 }
 
@@ -40,16 +40,6 @@ SHIFT_WINDOWS = {
         "Afternoon": {
             "range": (time(13, 0), time(16, 0)),
             "label": "1:00 PM – 4:00 PM"
-        }
-    },
-    "General Shift": {
-        "Morning": {
-            "range": (time(7, 30), time(10, 0)),
-            "label": "7:30 AM – 10:00 AM"
-        },
-        "Afternoon": {
-            "range": (time(16, 0), time(18, 30)),
-            "label": "4:00 PM – 6:30 PM"
         }
     },
     "Admin Shift": {
